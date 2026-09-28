@@ -1,0 +1,15 @@
+name: db-tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_USER: pgtest }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pgtest" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: PGHOST=localhost PGPORT=5432 PGUSER=pgtest PGPASSWORD=pw ./supabase/tests/run.sh
