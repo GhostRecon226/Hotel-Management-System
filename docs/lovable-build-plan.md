@@ -8,7 +8,7 @@ The older backend in this repo stays as a reference. It is not used in this plan
 
 | Phase | What | Prompts | Result you can see |
 |---|---|---|---|
-| 0 | Set up accounts | none | Empty Lovable project, Supabase project, GitHub sync |
+| 0 | Set up accounts | none | Empty Lovable project on Lovable Cloud, GitHub sync |
 | 1 | Foundation | 0 to 2 | Sign up, create a hotel, sign in, roles |
 | 2 | Setup and guests | 3 to 4 | Rooms, rates, tax, guest records |
 | 3 | Bookings and front desk | 5 to 7 | Book, assign, check in |
@@ -22,14 +22,16 @@ Plan for two to four weeks. Do one prompt at a time.
 
 Each phase needs the one before it. Money comes after bookings because charges attach to a stay. The hand-over pack comes last so Claude Code starts with a clear map.
 
-## Phase 0: set up (you, about 30 minutes)
+## Phase 0: set up (you, about 15 minutes)
 
-1. **Supabase.** Create your own project. Choose the Frankfurt region. Keep your own Supabase so the data and schema are yours. Save the database password.
-2. **Lovable.** Create a new project. Connect it to your Supabase project with Lovable's Supabase integration. Do not use Lovable Cloud's built-in database.
-3. **GitHub.** In Lovable, connect GitHub so it syncs code to a new repo. Name it `hms-app`. Turn on sync from the start.
-4. **Supabase Auth.** Turn on email confirmation. Turn on the `pg_cron` extension.
-5. **Credits.** Check your Lovable plan's monthly credits. The full build needs many messages.
+1. **Lovable.** Create a new project. Use Lovable Cloud for the backend for now. Do not connect your own Supabase yet.
+2. **GitHub.** In Lovable, connect GitHub so it syncs code to a new repo. Name it `hms-app`. Turn on sync from the start.
+3. **Project knowledge.** Paste prompt 0 into Project knowledge in Lovable settings. Do not send it as a chat message.
+4. **Credits.** Check your Lovable plan's monthly credits. The full build needs many messages.
+5. **Test data only.** Do not enter real guest or payment data while on Lovable Cloud.
 6. **Test users.** Keep three real email addresses handy for test users.
+
+Supabase comes later. When you move to Claude Code, Claude Code creates the Supabase project setup with you, applies the migration files and points the app at it.
 
 ## Rules that keep the code easy to hand over
 
@@ -59,7 +61,7 @@ PRODUCT
 A multi-tenant hotel management system for hotels in Nigeria first, then Africa. Hotels sign up themselves. Each hotel is a tenant. A tenant can have one or more properties. Base currency is NGN. Other currencies are allowed with a recorded exchange rate. Payments are taken outside the system and recorded here.
 
 STANDING RULES
-1. Use React, TypeScript, Tailwind and shadcn/ui. Use my own Supabase project. Do not use Lovable Cloud.
+1. Use React, TypeScript, Tailwind and shadcn/ui. Use Lovable Cloud for the backend for now. Keep every schema change as a SQL migration file in supabase/migrations, even though Lovable Cloud applies changes itself. The migration files must rebuild the whole database from empty on a plain Supabase project. Do not use features that only exist in Lovable Cloud.
 2. Put business rules in Postgres functions, called from the app with supabase.rpc. Keep React screens thin. Do not calculate money, tax, balances or availability in the browser.
 3. Every database change is a SQL file in supabase/migrations named YYYYMMDDHHMMSS_topic.sql. Never edit an old migration. Add a new one.
 4. Every table has tenant_id. Property-level tables also have property_id. Turn on row-level security on every table. A user sees only rows of their own tenant and their own properties.
@@ -104,6 +106,8 @@ Function create_hotel(business_name, country, property_name, full_name, city): f
 Add a trigger that stops the last System Administrator being removed.
 Add audit triggers on roles, role_permissions, user_property_roles and approval_limits.
 Write a short SQL test script in supabase/tests that proves a user from hotel A cannot read hotel B's rows.
+
+When you finish, confirm the migration files are saved in supabase/migrations in the repo. The files are the source of truth, not the Lovable Cloud database.
 ```
 
 ## Prompt 2: sign-in, sign-up and app shell
@@ -125,6 +129,8 @@ Add a database function that returns the current user's permissions per property
 
 Do not build any other screens.
 ```
+
+Check: sign up with a test email, confirm it, create a hotel, sign in again, and see the trial banner.
 
 ## Prompt 3: property setup
 
@@ -341,7 +347,7 @@ Screens: tickets list and detail with all actions and a Block room button. Servi
 Build the business date and reporting.
 
 Rules:
-1. Each property has a business date. It rolls automatically after a configurable time, default 03:00 property time. A scheduled job checks every 5 minutes and rolls the date when due.
+1. Each property has a business date. It rolls automatically after a configurable time, default 03:00 property time. A scheduled job checks every 5 minutes and rolls the date when due. First tell me whether Lovable Cloud can run a job every 5 minutes. If it cannot, build the function app.run_due_rollovers() and a button on the Admin page that runs it by hand, and note in docs/known-issues.md that the schedule is still to do.
 2. The roll posts room charges for in-house stays, marks unconfirmed tentative holds that have expired, marks no-shows for confirmed arrivals that did not show, and creates stayover housekeeping tasks.
 3. Each step is idempotent. A failed roll changes nothing and notifies the managers.
 4. Log every roll in business_date_log.
@@ -376,7 +382,7 @@ Screens: Users (list, invite, roles per property, enable and disable), Roles (li
 ```text
 Add the outbox and exports.
 
-1. notification_outbox: a queue for messages (channel: email, sms, whatsapp; recipient; subject; body; status: pending, sent, failed; attempts; last_error). Database functions add messages here. An Edge Function reads pending rows, sends email through Resend, marks them sent or failed, and retries with back-off. Run it every minute. Send reservation confirmations and approval alerts by email. Leave SMS and WhatsApp as stubs.
+1. notification_outbox: a queue for messages (channel: email, sms, whatsapp; recipient; subject; body; status: pending, sent, failed; attempts; last_error). Database functions add messages here. An Edge Function reads pending rows, sends email through Resend, marks them sent or failed, and retries with back-off. Run it every minute if Lovable Cloud allows scheduled jobs. If it does not, add a Run now button on the Admin page and note it in docs/known-issues.md. Send reservation confirmations and approval alerts by email. Leave SMS and WhatsApp as stubs.
 2. Exports: an Edge Function that exports reservations, folio transactions and guests to CSV for a date range. It checks the export permission and writes an audit entry.
 3. Add report views for cancellation rate, average length of stay, and outstanding balances by guest, and show them on the Reports page.
 ```
@@ -395,7 +401,8 @@ Review the whole app. Do not add features.
 7. Confirm every error shows the text after [E_CODE].
 8. Check every page at 1280 px and 768 px wide. Add loading and empty states.
 9. Add a confirmation before every action that cancels, reverses, refunds, merges or anonymises.
-10. List what is hidden, disabled or unfinished.
+10. Confirm every schema change exists as a file in supabase/migrations and that the files rebuild the database from empty. List any change that exists only in the Lovable Cloud database and add a migration file for it.
+11. List what is hidden, disabled or unfinished.
 
 Report what you found and fixed.
 ```
@@ -412,7 +419,7 @@ Write these files in the repo:
 4. docs/functions.md: every database function with arguments, returns, permission needed and error codes it can raise.
 5. docs/screens.md: every screen, its route, and the functions and views it uses.
 6. docs/known-issues.md: everything unfinished, hacky or doubtful. Be blunt.
-7. docs/lovable-notes.md: anything specific to Lovable that would need to change if the app moves to another build tool.
+7. docs/lovable-notes.md: anything specific to Lovable or Lovable Cloud that would need to change if the app moves to a plain Supabase project and another build tool. Include how the migrations were applied and any setting, secret or scheduled job configured outside the repo.
 
 Make sure all schema changes are in supabase/migrations and the migrations run cleanly from an empty database. Remove unused code and files. Do not add features.
 ```
@@ -425,4 +432,12 @@ When prompt 17 is done:
 1. Confirm the code is synced to the `hms-app` repo.
 2. Start a Claude Code session in that repo. Tell it to read `docs/known-issues.md`, then the architecture and data model.
 3. Claude Code compares this schema with the tested backend in the `Hotel-Management-System` repo. It keeps whichever parts are stronger. It runs the tests, fixes gaps and hardens the ledger, approvals and security.
-4. Then decide if you keep Lovable for screens or move everything to Claude Code. The rules in prompt 0 make either path possible.
+
+## Moving from Lovable Cloud to Supabase
+
+1. You create the Supabase project. Pick the region. Turn on email confirmation and the `pg_cron` extension.
+2. You run `supabase link` in the repo, or give Claude Code an access token for that one project and revoke it afterward.
+3. Claude Code does a dry run on a throwaway project. It applies the migrations and runs the tests.
+4. Claude Code applies the migrations to your real Supabase project, deploys the Edge Functions, sets up the scheduled jobs, and changes the app's project URL and public key.
+5. Test users sign up again. Passwords do not move between the two systems. Data can be copied by query if you need it.
+6. Then decide if you keep Lovable for screens or move everything to Claude Code. The rules in prompt 0 make either path possible.
