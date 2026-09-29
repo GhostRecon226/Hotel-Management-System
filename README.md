@@ -12,7 +12,7 @@ Multi-tenant hotel management system. Supabase Postgres backend. Lovable UI.
 - `CLAUDE.md` rules for Claude sessions
 - `docs/lovable-guide.md` what Lovable needs to build the UI
 - `docs/decisions.md` decisions log
-- `docs/lovable-prompts.md` ordered prompts to build the UI
+- `docs/lovable-build-plan.md` ordered prompts to build the UI
 - `docs/HMS_R1_Requirements.xlsx` requirements with acceptance criteria
 
 ## Deploy to Supabase
